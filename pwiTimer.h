@@ -10,26 +10,22 @@
  * of the internal Arduino timers, nor on any interrupts. Instead this one
  * relies on being called repeatidly on each loop.
  *
+ * The timer is caracterized by the delay, the callback and the user_data.
+ *
  * Do not expect a great precision here. In best case, it will be about 1-2 ms.
  * The precision may decrease until 10-20 ms if the main loop is too long.
  *
  * Synopsys:
+ * a) define a new timer:
+ *    pwiTimer myTimer;
+ * b) configure the timer:
+ *    myTimer.setup( label, delay_ms, once, cb, user_data );
+ * c) start the timer:
+ *    myTimer.start();
  *
- * Define a new timer:
- *   pwiTimer timer.setup( delay_ms, once, cb, user_data );
- *
- *   It is caracterized by the delay, the callback and the user_data.
- *
- * Start a defined timer:
- *   timer.start();
- *
- *   The predefined timer is started.
- *   This timer is not reentrant: once it has been started, it cannot
- *   be reused before having been stopped before.
- *   At end of the predefined delay, the callback will be called with
- *   the passed-in user data. At this time, the timer is automatically
- *   disabled, and should be re-started for another use.
- *   This is a one time call timer.
+ * At end of the predefined delay, the callback will be called with
+ * the passed-in user data. At this time, the timer is automatically
+ * disabled, and should be re-started for another use.
  *
  * Once more time: this simplissim timer relies on being repeatedly called by
  * the main loop.
@@ -39,6 +35,7 @@
  *                   set() is renamed setup()
  * pwi 2019- 5-27 v5 renamed to pwiTimer
  * pwi 2019- 6- 3 v6 improve resetting the timer delay
+ * pwi 2019- 8- 4 getDelay() new method
  */
 
 /* The prototype for the timer callback function to be provided by the caller.
@@ -50,6 +47,7 @@ typedef void ( *pwiTimerCb )( void * );
 class pwiTimer {
     public:
                       pwiTimer( void );
+        unsigned long getDelay();
         unsigned long getRemaining();
         bool          isStarted();
         void          restart( void );

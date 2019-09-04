@@ -1,5 +1,4 @@
 #include "pwiTimer.h"
-#include "untilNow.h"
 
 /*
  * pwi 2017- 5-20 v3 add getRemaining() method
@@ -7,6 +6,9 @@
  *                   set() is renamed setup()
  * pwi 2019- 5-27 v5 renamed to pwiTimer
  * pwi 2019- 6- 3 v6 improve resetting the timer delay
+ * pwi 2019- 8- 4 getDelay() new method
+ *                remove untilNow() function
+ *                see https://arduino.stackexchange.com/questions/12587/how-can-i-handle-the-millis-rollover
  */
 
 // uncomment to debugging this file
@@ -42,21 +44,36 @@ pwiTimer::pwiTimer( void )
 }
 
 /**
+ * pwiTimer::getDelay:
+ *
+ * Returns: the delay configured for this timer.
+ */
+unsigned long pwiTimer::getDelay( void )
+{
+    return( this->delay_ms );
+}
+
+/**
  * pwiTimer::getRemaining:
  *
- * Returns: the remaining count of ms.
+ * Returns: zero if the timer is disabled (delay_ms=0), or the remaining count
+ * of ms.
  */
 unsigned long pwiTimer::getRemaining( void )
 {
-    unsigned long duration = untilNow( millis(), this->start_ms );
-    unsigned long remaining = untilNow( this->delay_ms, duration );
+    unsigned long now = millis();
+    unsigned long duration = now - this->start_ms;
+    unsigned long remaining = 0;
+    if( this->delay_ms ){
+        remaining = this->delay_ms - duration;
+    }
 #ifdef TIMER_DEBUG
     Serial.print( F( "[pwiTimer::getRemaining] delay_ms=" ));
     Serial.print( this->delay_ms );
     Serial.print( F( ", start_ms=" ));
     Serial.print( this->start_ms );
     Serial.print( F( ", now=" ));
-    Serial.print( millis());
+    Serial.print( now );
     Serial.print( F( ", duration=" ));
     Serial.print( duration );
     Serial.print( F( ", remaining=" ));
@@ -92,21 +109,18 @@ void pwiTimer::restart( void )
  *
  * Remarks :
  * 1. if the new delay is zero, the timer is stopped.
- * 2. when decreasing the delay, the user expects the next callback to be at most
- *    at this new delay...
+ * 2. the timer is restarted with the provided new delay: the callback will so
+ *    be next triggered with this same new delay.
  * 
  * Change the configured delay.
  */
 void pwiTimer::setDelay( unsigned long delay_ms )
 {
-	unsigned long remaining = this->getRemaining();
     this->delay_ms = delay_ms;
 
 	if( delay_ms == 0 ){
 		this->stop();
-	}
-
-	if( remaining > delay_ms ){
+	} else {
 		this->restart();
 	}
 }
@@ -114,9 +128,10 @@ void pwiTimer::setDelay( unsigned long delay_ms )
 /**
  * pwiTimer::setup:
  * @label: [allow-none]: a label to identify or qualify the timer;
- *  as we do not copy the string, it must stay valid during the life
- *  of the object.
- * @delay_ms: the duration of the timer; must be greater than zero.
+ *  Please note that the method get a copy of the provided pointer, not a copy
+ *  of the string itself. The caller should make sure that the provided pointer
+ *  will stay safe if use during execution.
+ * @delay_ms: the duration of the timer; zero for disable the timer.
  * @once: whether the @cb callback must be called only once, or regularly.
  * @cb: [allow-none]: the callback.
  * @user_data: [allow-none]: the user data to be passed to the callback.
@@ -128,7 +143,6 @@ void pwiTimer::setDelay( unsigned long delay_ms )
  * 
  * If @once is %TRUE, the timer is then disabled, and will stay inactive
  * until started another time.
- * 
  * If @once is %FALSE, the @cb callback will be called regularly each
  * @delay_ms.
  */
@@ -187,7 +201,7 @@ void pwiTimer::Dump( void )
 }
 
 /**
- * pwiTimer::runLoop:
+ * pwiTimer::Loop:
  * 
  * This function is meant to be called from the main loop.
  * 
@@ -225,7 +239,9 @@ void pwiTimer::objDump( uint8_t idx )
     Serial.print( F( ", user_data=" ));
     Serial.print(( int ) user_data );
     Serial.print( F( ", debug=" ));
-    Serial.println( debug ? "True":"False" );
+    Serial.print( debug ? "True":"False" );
+    Serial.print( F( ", start_ms=" ));
+    Serial.println( this->start_ms );
 #endif
 }
 
@@ -240,8 +256,9 @@ void pwiTimer::objDump( uint8_t idx )
 void pwiTimer::objLoop( void )
 {
     if( this->start_ms > 0 ){
-        unsigned long duration = untilNow( millis(), this->start_ms );
-        if( duration > this->delay_ms ){
+        unsigned long now = millis();
+        unsigned long duration = now - this->start_ms;
+        if( duration >= this->delay_ms ){
 #ifdef TIMER_DEBUG
             if( this->debug ){
                 Serial.print( F( "[pwiTimer::objLoop] " ));
@@ -258,13 +275,13 @@ void pwiTimer::objLoop( void )
                 Serial.println( duration );
             }
 #endif
-            if( this->once ){
-                this->start_ms = 0;
-            } else {
-                this->start_ms = millis();
-            }
             if( this->cb ){
                 this->cb( this->user_data );
+            }
+            if( this->once ){
+                this->stop();
+            } else {
+                this->restart();
             }
         }
     }
@@ -272,22 +289,25 @@ void pwiTimer::objLoop( void )
 
 /**
  * pwiTimer::objStart:
- * @restart: whether we accept to re-start an already started timer.
+ * @restart: whether the initial request was to start() or restart() the timer.
  * 
  * Start or restart the timer.
+ *
+ * There is no difference between start() and restart(): in the two cases, the
+ * timer is started from now, whatever be its previous state.
  * 
  * Private
  */
 void pwiTimer::objStart( bool restart )
 {
-    if( this->delay_ms > 0 ){
-        if( this->start_ms > 0 && !restart ){
-            Serial.println( F( "[pwiTimer::objStart] ERROR: timer already started" ));
-        } else {
-            this->start_ms = millis();
+    if( this->delay_ms ){
+        this->start_ms = millis();
+        // manage the millis() rollover to make sure start_ms is not zero
+        if( !this->start_ms ){
+            this->start_ms += 1;
         }
     } else {
-        Serial.println( F( "[pwiTimer::objStart] ERROR: unable to start the timer while delay is not set" ));
+        Serial.println( F( "[pwiTimer::objStart] unable to start the timer while delay is not set" ));
     }
 }
 
