@@ -8,7 +8,8 @@
  *                   new trigger() method
  *                   fix setArmed() with payload
  * pwi 2019- 5-27 v5 renamed to pwiSensor
-*/
+ * pwi 2019- 9- 3 fix typo
+ */
 
 #include <core/MySensorsCore.h>
 
@@ -27,18 +28,18 @@ pwiSensor::pwiSensor( void )
     this->id = 0;
     this->type = 0;
     this->label = NULL;
-    this->armed = true;
-    this->min_period_ms = 0;
-    this->max_period_ms = 0;
+    this->armed = false;
     this->sendCb = NULL;
   	this->measureCb = NULL;
     this->send_on_change = true;
+
+    this->setArmed( true );
 }
 
 /**
  * pwiSensor::getId:
  * 
- * Returns: the node identifier.
+ * Returns: the node identifier as provided to the present() method.
  *
  * Public
  */
@@ -53,7 +54,9 @@ uint8_t pwiSensor::getId()
  * Returns: %TRUE if the sensor is armed.
  * 
  * If the sensor is not armed, no measure is taken.
- * The messages sent are so ARMED=false, TRIPPED=false.
+ * In this case, the sent messages are ARMED=false, TRIPPED=false.
+ *
+ * At construction time, pwiSensor's default to be armed.
  *
  * Public
  */
@@ -63,14 +66,42 @@ bool pwiSensor::isArmed()
 }
 
 /**
+ * pwiSensor::measureAndSend:
+ *
+ * Take the measure, sending the message if needed.
+ * Reset timers as a side effect.
+ *
+ * Public
+ */
+void pwiSensor::measureAndSend()
+{
+    if( this->armed ){
+        if( this->measureCb ){
+            bool changed = this->measureCb( this->user_data );
+            this.min_timer.restart();
+            if( changed && this->send_on_change ){
+                this->send();
+            }
+        }
+    }
+}
+
+/**
  * pwiSensor::present:
+ * @id: the child identifier inside of this MySensor node; must be unique inside
+ *  of this node.
+ * @type: the MySensor type of this child sensor.
+ * @label: a qualifying label for this child sensor.
+ *  Please note that the method get a copy of the provided pointer, not a copy
+ *  of the string itself. The caller should make sure that the provided pointer
+ *  will stay safe if use during execution.
  *
  * Present the node to the controller.
- * This alwo may be done by the main program, but this method lets the object
- * take a copy of some characteristics of the sensor node, and these data may
- * be usefully used in debug messages.
+ * This also may be done directly by the main program, but this method lets the
+ * object take a copy of some characteristics of the sensor node, and these data
+ * may be usefully used in debug messages.
  *
- * So this method is just for having readible debug messages.
+ * So this method is just for having readable debug messages.
  *
  * Public
  */
@@ -91,7 +122,29 @@ void pwiSensor::present( uint8_t id, uint8_t type, const char *label )
 }
 
 /**
+ * pwiSensor::send:
+ *
+ * Send the message unconditionnally (at least if the sensor is armed).
+ *
+ * Public
+ */
+void pwiSensor::send()
+{
+    if( this->armed ){
+        if( this->sendCb ){
+            this->sendCb( this->user_data );
+            this->min_timer.restart();
+            this->max_timer.restart();
+        }
+    }
+}
+
+/**
  * pwiSensor::setArmed:
+ * @armed: whether this sensor must be armed.
+ *  As a reminder, only armed sensors take measure, and consequently send changes
+ *  to the controller.
+ *  As a side effect, unarming the sensor stops all the timers.
  * 
  * Arm/unarm the sensor.
  *
@@ -108,85 +161,137 @@ void pwiSensor::setArmed( bool armed )
 
 /**
  * pwiSensor::setArmed:
+ * @payload: a string received from the controller, which is expected to be an
+ *  arm or unarm command.
+ *  Accepted strings are:
+ *  'ARM=1': arm the sensor (take measures, send changes, and so on)
+ *  'ARM=0': unarm the sensor, disabling all measures.
  *
- * Arm the sensor depending of a received message which should be 'ARM=1|0'.
+ * Arm the sensor depending of a received message.
  *
- * Returns: %TRUE if the payload rightly begins with 'ARM=', %FALSE else.
+ * Returns: %PWI_SENSOR_OK if the arm status has been successfully set, or the
+ * error code.
  *
  * Public
  */
-bool pwiSensor::setArmed( const char *payload )
+uint8_t pwiSensor::setArmed( const char *payload )
 {
     if( strncmp( payload, "ARM=", 4 ) != 0 ){
-        return( false );
+        return( PWI_SENSOR_ERR03 );
     }
-
-    bool armed = ( bool )( atoi( payload+4 ));
-    this->setArmed( armed );
-    return( true );
+    if( strlen( payload ) != 5 ){
+        return( PWI_SENSOR_ERR03 );
+    }
+    char arg = payload[4];
+    if( arg != '0' && arg != '1' ){
+        return( PWI_SENSOR_ERR03 );
+    }
+    this->setArmed( arg == '1' );
+    return( PWI_SENSOR_OK );
 }
 
 /**
  * pwiSensor::setMaxPeriod:
- * 
- * Position the min frequency at which the measure has to be sent.
- * This corresponds to a sort of heartbeat for the sensor.
+ * @delay_ms: the maximal period at which the measure has to be sent.
+ *  This is also called the unchanged timeout: the delay for re-sending a measure
+ *  which has not changed.
+ *  This minimal frequency corresponds to a sort of heartbeat for the sensor: if
+ *  no message has been received during this interval, then the sensor should be
+ *  considered as dead.
+ *  If zero, the corresponding timer is disabled.
+ *  Else, and greater than the min period, the timer is setup and started.
+ *  If not zero, but smaller than the min period, then an error is logged and
+ *  returned. The max timer is left unchanged.
+ *
+ * Configure and start the max timer.
+ *
+ * Returns: %PWI_SENSOR_OK if the timer has been successfully set, or the error
+ * code.
  *
  * Public
  */
-void pwiSensor::setMaxPeriod( unsigned long delay_ms )
+uint8_t pwiSensor::setMaxPeriod( unsigned long delay_ms )
 {
-    if( delay_ms > this->min_period_ms ){
-		    this->max_period_ms = delay_ms;
-    		this->max_timer.setDelay( delay_ms );
-    		if( this->max_timer.isStarted()){
-    			  this->max_timer.restart();
-    		}
-  	}
+    unsigned long min_period = this->min_timer.getDelay();
+    if( delay_ms && ( delay_ms < min_period )){
+        return( PWI_SENSOR_ERR01 );
+    }
+	// delay_ms may be zero
+    this->max_timer.setup( "MaxPeriodTimer", delay_ms, true, pwiSensor::onMaxPeriodCb, this );
+    this->max_timer.start();
+    return( PWI_SENSOR_OK );
 }
 
 /**
  * pwiSensor::setMinPeriod:
- * 
- * Position the max frequency at which the measure has to be made.
- * If zero, then stop the timer.
+ * @delay_ms: the minimal period at which the measure has to be taken.
+ *  This is also called the maximal frequency: the minimal delay for the
+ *  controller not to be flooded. At this frequency, the measure is taken and
+ *  sent to the controller (if send_on_change is %TRUE, which is the constructor
+ *  default).
+ *  If zero, then stop the timer.
+ *  If greater than the max period, then an error is logged and returned. The
+ *  min timer is left unchanged.
+ *
+ * Configure and start the min timer.
+ *
+ * Returns: %PWI_SENSOR_OK if the timer has been successfully set, or the error
+ * code.
  *
  * Public
  */
-void pwiSensor::setMinPeriod( unsigned long delay_ms )
+uint8_t pwiSensor::setMinPeriod( unsigned long delay_ms )
 {
-    if( delay_ms < this->max_period_ms ){
-        this->min_period_ms = delay_ms;
-        this->min_timer.setDelay( delay_ms );
-        if( this->min_period_ms == 0 ){
-            this->min_timer.stop();
-        } else if( this->min_timer.isStarted()){
-            this->min_timer.restart();
-        }
+    unsigned long max_period = this->max_timer.getDelay();
+    if( max_period && max_period < delay_ms ){
+        res = PWI_SENSOR_ERR02;
     }
+	// delay_ms may be zero
+    min_timer.setup( "MinPeriodTimer", delay_ms, true, pwiSensor::onMinPeriodCb, this );
+    this->min_timer.start();
+    return( PWI_SENSOR_OK );
 }
 
 /**
  * pwiSensor::setSendOnChange:
- * 
- * Whether a message should be sent to the controller each time the measure changes.
- * This is the default behavior for all our sensor nodes.
- * But, this should not be the case for alarm nodes, where the message must only be
- * send after the expiration of the grace period.
+ * @send: whether a message should be sent to the controller each time the
+ *  measure changes.
+ *  This is the default behavior set at construction time for all our sensor
+ *  nodes.
+ *  But, this should not be the case for alarm nodes, where the message must
+ *  only be send after the expiration of the grace period.
+ *
+ * Configure the 'send on change' behavior.
  *
  * Public
  */
-void pwiSensor::setSendOnChange( bool autosend )
+void pwiSensor::setSendOnChange( bool send )
 {
-    this->send_on_change = autosend;
+    this->send_on_change = send;
 }
 
 /**
  * pwiSensor::setup:
+ * @min_period_ms: the min period, aka the max frequency, in ms.
+ *  Only applies if greater than zero, the sensor is armed, and a @measureCb
+ *  callback function has been provided.
+ *  Measures are taken at this exact frequency.
+ *  Set to zero to disable the timer, and thus disable all measures.
+ *  Must be smaller than the @max_period_ms if this later is greater than zero.
+ * @max_period_ms: the max period, aka the unchanged timeout, in ms.
+ *  Only applies if greater than zero, the sensor is armed, and a @sendCb
+ *  callback function has been provided.
+ *  Last taken measure is unconditionnally sent to the controller.
+ *  Set to zero to disable the timer, and thus disable all messages.
+ * @measureCb: the callback function which takes the measure.
+ * @sendCb: the callback function which sends the last measure to the controller.
+ * @user_data: [allow-none]: the user data to be passed to the callbacks.
+ *
+ * Configure the sensor.
  * 
  * Public
  */
-void pwiSensor::setup( unsigned long max_period_ms, unsigned long min_period_ms, pwiMeasureCb measureCb, pwiSendCb sendCb, void *user_data )
+void pwiSensor::setup( unsigned long min_period_ms, unsigned long max_period_ms, pwiMeasureCb measureCb, pwiSendCb sendCb, void *user_data )
 {
 #ifdef SENSOR_DEBUG
     Serial.print( F( "[pwiSensor::setup] id=" ));
@@ -196,51 +301,26 @@ void pwiSensor::setup( unsigned long max_period_ms, unsigned long min_period_ms,
     Serial.print( F( ", max_period_ms=" ));
     Serial.println( max_period_ms );
 #endif
+    // setup the timers
+    this->setMinPeriod( min_period_ms );
+    this->setMaxPeriod( max_period_ms );
+    // record the callbacks
     this->measureCb = measureCb;
     this->sendCb = sendCb;
     this->user_data = user_data;
-
-    max_timer.setup( "MaxPeriodTimer", max_period_ms, true, pwiSensor::onMaxPeriodCb, this );
-    this->setMaxPeriod( max_period_ms );
-
-    min_timer.setup( "MinPeriodTimer", min_period_ms, false, pwiSensor::onMinPeriodCb, this );
-    this->setMinPeriod( min_period_ms );
-    min_timer.start();
-}
-
-/**
- * pwiSensor::trigger:
- *
- * Simulates the expiration of the max frequency timer, so triggers a measure
- * and, maybe, a send of a message.
- * 
- * Public
- */
-void pwiSensor::trigger()
-{
-    pwiSensor::onMinPeriodCb( this );
 }
 
 /**
  * pwiSensor::onMaxPeriodCb:
  * 
  * Callback to handle the maximum period (the heartbeat).
- * Refresh the measure before sending the result.
+ * Unconditionnaly send the last taken measure.
  * 
  * Private Static
  */
 void pwiSensor::onMaxPeriodCb( pwiSensor *node )
 {
-#ifdef SENSOR_DEBUG
-    Serial.print( F( "[pwiSensor::onMaxPeriodCb] node_id=" ));
-    Serial.println( node->getId());
-#endif
-    if( node->armed ){
-        if( node->sendCb ){
-            node->sendCb( node->user_data );
-            node->max_timer.restart();
-        }
-    }
+    node->send();
 }
 
 /**
@@ -253,19 +333,6 @@ void pwiSensor::onMaxPeriodCb( pwiSensor *node )
  */
 void pwiSensor::onMinPeriodCb( pwiSensor *node )
 {
-#ifdef SENSOR_DEBUG
-    //Serial.print( F( "[pwiSensor::onMinPeriodCb] node_id=" ));
-    //Serial.println( node->getId());
-#endif
-    if( node->armed ){
-        if( node->measureCb ){
-            if( node->measureCb( node->user_data )){
-                if( node->sendCb && node->send_on_change ){
-                    node->sendCb( node->user_data );
-                    node->max_timer.restart();
-                }
-            }
-        }
-    }
+	node->measureAndSend();
 }
 
