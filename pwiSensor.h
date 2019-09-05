@@ -5,7 +5,7 @@
 #include "pwiTimer.h"
 
 /*
- * A base, but usable, class for any measurement sensor.
+ * A base class for any measurement sensor.
  *
  * A measurement sensor defines:
  * - the max frequency at which send to the controller the changes of the
@@ -62,7 +62,7 @@ enum {
 class pwiSensor {
     public:
                       pwiSensor();
-		uint8_t       getId();
+        uint8_t       getId();
         bool          isArmed();
         void          measureAndSend();
         void          present( uint8_t id, uint8_t type, const char *label );
@@ -86,8 +86,8 @@ class pwiSensor {
         pwiSendCb     sendCb;
         void         *user_data;
 
-        static void   onMinPeriodCb( pwiSensor *node);
-        static void   onMaxPeriodCb( pwiSensor *node);
+        static void   OnMinPeriodCb( pwiSensor *node);
+        static void   OnMaxPeriodCb( pwiSensor *node);
 };
 
 #endif // __PWI_SENSOR_H__

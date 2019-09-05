@@ -16,12 +16,15 @@
 // uncomment to debugging this file
 #define SENSOR_DEBUG
 
+static const char * const strMinPeriodTimer = "MinPeriodTimer";
+static const char * const strMaxPeriodTimer = "MaxPeriodTimer";
+
 /**
  * pwiSensor::pwiSensor:
  * 
  * Constructor.
  *
- * Public
+ * Public.
  */
 pwiSensor::pwiSensor( void )
 {
@@ -41,7 +44,7 @@ pwiSensor::pwiSensor( void )
  * 
  * Returns: the node identifier as provided to the present() method.
  *
- * Public
+ * Public.
  */
 uint8_t pwiSensor::getId()
 {
@@ -58,7 +61,7 @@ uint8_t pwiSensor::getId()
  *
  * At construction time, pwiSensor's default to be armed.
  *
- * Public
+ * Public.
  */
 bool pwiSensor::isArmed()
 {
@@ -71,14 +74,13 @@ bool pwiSensor::isArmed()
  * Take the measure, sending the message if needed.
  * Reset timers as a side effect.
  *
- * Public
+ * Public.
  */
 void pwiSensor::measureAndSend()
 {
     if( this->armed ){
         if( this->measureCb ){
             bool changed = this->measureCb( this->user_data );
-            this.min_timer.restart();
             if( changed && this->send_on_change ){
                 this->send();
             }
@@ -134,7 +136,6 @@ void pwiSensor::send()
         if( this->sendCb ){
             this->sendCb( this->user_data );
             this->min_timer.restart();
-            this->max_timer.restart();
         }
     }
 }
@@ -217,7 +218,7 @@ uint8_t pwiSensor::setMaxPeriod( unsigned long delay_ms )
         return( PWI_SENSOR_ERR01 );
     }
 	// delay_ms may be zero
-    this->max_timer.setup( "MaxPeriodTimer", delay_ms, true, pwiSensor::onMaxPeriodCb, this );
+    this->max_timer.setup( strMaxPeriodTimer, delay_ms, false, pwiSensor::OnMaxPeriodCb, this );
     this->max_timer.start();
     return( PWI_SENSOR_OK );
 }
@@ -244,10 +245,10 @@ uint8_t pwiSensor::setMinPeriod( unsigned long delay_ms )
 {
     unsigned long max_period = this->max_timer.getDelay();
     if( max_period && max_period < delay_ms ){
-        res = PWI_SENSOR_ERR02;
+        return( PWI_SENSOR_ERR02 );
     }
 	// delay_ms may be zero
-    min_timer.setup( "MinPeriodTimer", delay_ms, true, pwiSensor::onMinPeriodCb, this );
+    min_timer.setup( strMinPeriodTimer, delay_ms, false, pwiSensor::OnMinPeriodCb, this );
     this->min_timer.start();
     return( PWI_SENSOR_OK );
 }
@@ -311,27 +312,33 @@ void pwiSensor::setup( unsigned long min_period_ms, unsigned long max_period_ms,
 }
 
 /**
- * pwiSensor::onMaxPeriodCb:
+ * pwiSensor::OnMaxPeriodCb:
  * 
  * Callback to handle the maximum period (the heartbeat).
  * Unconditionnaly send the last taken measure.
+ *
+ * Note: the @max_timer will be automatically restarted by the pwiTimer class
+ *  after this method has returned.
  * 
- * Private Static
+ * Private Static.
  */
-void pwiSensor::onMaxPeriodCb( pwiSensor *node )
+void pwiSensor::OnMaxPeriodCb( pwiSensor *node )
 {
     node->send();
 }
 
 /**
- * pwiSensor::onMinPeriodCb:
+ * pwiSensor::OnMinPeriodCb:
  * 
  * Callback to handle the minimum period (the max frequency of the measure).
  * If the sensor is not armed, then no measure is taken.
+ *
+ * Note: the @min_timer will be automatically restarted by the pwiTimer class
+ *  after this method has returned.
  * 
- * Private Static
+ * Private Static.
  */
-void pwiSensor::onMinPeriodCb( pwiSensor *node )
+void pwiSensor::OnMinPeriodCb( pwiSensor *node )
 {
 	node->measureAndSend();
 }
