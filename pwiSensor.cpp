@@ -83,6 +83,7 @@ void pwiSensor::measureAndSend()
             bool changed = this->measureCb( this->user_data );
             if( changed && this->send_on_change ){
                 this->send();
+                this->max_timer.restart();
             }
         }
     }
