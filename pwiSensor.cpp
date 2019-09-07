@@ -9,12 +9,13 @@
  *                   fix setArmed() with payload
  * pwi 2019- 5-27 v5 renamed to pwiSensor
  * pwi 2019- 9- 3 fix typo
+ * pwi 2019- 9- 7 take a copy of the sensor label
  */
 
 #include <core/MySensorsCore.h>
 
 // uncomment to debugging this file
-#define SENSOR_DEBUG
+//#define SENSOR_DEBUG
 
 static const char * const strMinPeriodTimer = "MinPeriodTimer";
 static const char * const strMaxPeriodTimer = "MaxPeriodTimer";
@@ -30,7 +31,7 @@ pwiSensor::pwiSensor( void )
 {
     this->id = 0;
     this->type = 0;
-    this->label = NULL;
+    memset( this->label, '\0', 1+MAX_PAYLOAD );
     this->armed = false;
     this->sendCb = NULL;
   	this->measureCb = NULL;
@@ -95,9 +96,8 @@ void pwiSensor::measureAndSend()
  *  of this node.
  * @type: the MySensor type of this child sensor.
  * @label: a qualifying label for this child sensor.
- *  Please note that the method get a copy of the provided pointer, not a copy
- *  of the string itself. The caller should make sure that the provided pointer
- *  will stay safe if use during execution.
+ *  A copy of the string is taken; the provided @label may so be safely freed by
+ *  the caller after this function returns.
  *
  * Present the node to the controller.
  * This also may be done directly by the main program, but this method lets the
@@ -111,7 +111,7 @@ void pwiSensor::measureAndSend()
 void pwiSensor::present( uint8_t id, uint8_t type, const char *label )
 {
 #ifdef SENSOR_DEBUG
-    Serial.print( F( "[pwiSensor::present] id=" ));
+    Serial.print( F( "pwiSensor::present() id=" ));
     Serial.print( id );
     Serial.print( F( ", type=" ));
     Serial.print( type );
@@ -120,7 +120,7 @@ void pwiSensor::present( uint8_t id, uint8_t type, const char *label )
 #endif
     this->id = id;
     this->type = type;
-    this->label = label;
+    strncpy( this->label, label, MAX_PAYLOAD );
     ::present( this->id, this->type, this->label );
 }
 
@@ -296,7 +296,7 @@ void pwiSensor::setSendOnChange( bool send )
 void pwiSensor::setup( unsigned long min_period_ms, unsigned long max_period_ms, pwiMeasureCb measureCb, pwiSendCb sendCb, void *user_data )
 {
 #ifdef SENSOR_DEBUG
-    Serial.print( F( "[pwiSensor::setup] id=" ));
+    Serial.print( F( "pwiSensor::setup() id=" ));
     Serial.print( this->id );
     Serial.print( F( ", min_period_ms=" ));
     Serial.print( min_period_ms );
@@ -325,6 +325,10 @@ void pwiSensor::setup( unsigned long min_period_ms, unsigned long max_period_ms,
  */
 void pwiSensor::OnMaxPeriodCb( pwiSensor *node )
 {
+#ifdef SENSOR_DEBUG
+    Serial.print( F( "pwiSensor::OnMaxPeriodCb() id=" ));
+    Serial.println( node->id );
+#endif
     node->send();
 }
 
@@ -341,6 +345,10 @@ void pwiSensor::OnMaxPeriodCb( pwiSensor *node )
  */
 void pwiSensor::OnMinPeriodCb( pwiSensor *node )
 {
+#ifdef SENSOR_DEBUG
+    Serial.print( F( "pwiSensor::OnMinPeriodCb() id=" ));
+    Serial.println( node->id );
+#endif
 	node->measureAndSend();
 }
 

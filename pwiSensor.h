@@ -2,6 +2,7 @@
 #define __PWI_SENSOR_H__
 
 #include <Arduino.h>
+#include <core/MyMessage.h>
 #include "pwiTimer.h"
 
 /*
@@ -35,6 +36,7 @@
  *                introduce PWI_SENSOR return codes
  *                setup() takes first min, then max periods => breaks backward compatibility
  *                trigger() is renamed to measureAndSend()
+ * pwi 2019- 9- 7 take a copy of the sensor label
  */
 
 /* The prototype for the send callback function to be provided by the caller.
@@ -77,7 +79,7 @@ class pwiSensor {
     private:
         uint8_t       id;
         uint8_t       type;
-        const char   *label;
+        char          label[1+MAX_PAYLOAD];
         bool          armed;
         bool          send_on_change;
         pwiTimer      min_timer;                // min period, aka max frequency
