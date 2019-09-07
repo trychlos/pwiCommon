@@ -41,7 +41,7 @@ class pwiDallasSensor : public pwiSensor {
         DallasTemperature dallasTemperatureBus;
         bool              dallasBusInitialized;
         uint8_t           device_count;
-        uint8_t           measures[PWI_DALLAS_SENSOR_MAX_ATTACHED];
+        uint16_t          measures[PWI_DALLAS_SENSOR_MAX_ATTACHED];
 
         static bool       Measure( pwiDallasSensor *sensor )    { return( sensor->measure()); }
         static void       Send( pwiDallasSensor *sensor )       { sensor->send(); }

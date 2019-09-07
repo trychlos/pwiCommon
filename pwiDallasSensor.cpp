@@ -3,10 +3,11 @@
 
 /*
  * pwi 2019- 9- 5 creation
+ * pwi 2019- 9- 7 identify the sensor on its label rather than on its MySensor Id.
  */
 
 // uncomment to debugging this file
-//#define SENSOR_DEBUG
+//#define DALLAS_DEBUG
 
 /**
  * pwiDallasSensor::pwiDallasSensor:
@@ -50,6 +51,10 @@ void pwiDallasSensor::init( void )
  */
 void pwiDallasSensor::before()
 {
+#ifdef DALLAS_DEBUG
+    Serial.print( F( "pwiDallasSensor::before() oneWirePin=" ));
+    Serial.println( this->oneWirePin );
+#endif
     if( this->oneWirePin > 0 ){
         this->dallasTemperatureBus.begin();
         this->dallasBusInitialized = true;
@@ -65,6 +70,10 @@ void pwiDallasSensor::before()
  */
 void pwiDallasSensor::present()
 {
+#ifdef DALLAS_DEBUG
+    Serial.print( F( "pwiDallasSensor::present() oneWirePin=" ));
+    Serial.println( this->oneWirePin );
+#endif
     String label = "Temperature sensor #";
     if( this->dallasBusInitialized ){
         //this->device_count = this->dallasTemperatureBus.getDeviceCount();
@@ -75,7 +84,7 @@ void pwiDallasSensor::present()
     }
     for( int i=0 ; i<this->device_count ; ++i ){
         int id = i+PWI_DALLAS_SENSOR_START_ID;
-        String str = label + id;
+        String str = label + i;
         dynamic_cast< pwiSensor& >( *this ).present( id, S_TEMP, str.c_str());
     }
 }
@@ -84,7 +93,7 @@ void pwiDallasSensor::present()
  * pwiDallasSensor::setOneWirePin:
  * @oneWirePin: the pin number which is to be managed as our OneWire bus.
  * 
- * Constructor.
+ * Set the pin number to which the OneWire bus is attached.
  *
  * Public.
  */
@@ -105,13 +114,17 @@ void pwiDallasSensor::setOneWirePin( uint8_t pin )
  */
 void pwiDallasSensor::setup( void )
 {
+#ifdef DALLAS_DEBUG
+    Serial.print( F( "pwiDallasSensor::setup() oneWirePin=" ));
+    Serial.println( this->oneWirePin );
+#endif
     unsigned long min_period = 60000;     // 1 mn
     unsigned long max_period = 1800000;   // 30 mn
 
     if( this->device_count > 0 ){
         // requestTemperatures() will not block current thread
         this->dallasTemperatureBus.setWaitForConversion( false );
-        dynamic_cast< pwiSensor& >( *this ).setup( min_period, max_period, pwiDallasSensor::Measure, pwiDallasSensor::Send );
+        dynamic_cast< pwiSensor& >( *this ).setup( min_period, max_period, pwiDallasSensor::Measure, pwiDallasSensor::Send, this );
     }
 }
 
@@ -132,9 +145,17 @@ bool pwiDallasSensor::measure()
     
         // Fetch and round temperature to one decimal
         for( int i=0 ; i<this->device_count ; i++ ){
-            float temperature = ( static_cast<float>(this->dallasTemperatureBus.getTempCByIndex(i)) * 10.) / 10.;
-            if( temperature != -127.00 && temperature != 85.00 ){
-                int itemp = ( int ) 10*temperature;
+            float temperature = this->dallasTemperatureBus.getTempCByIndex(i);
+            int itemp = ( int )( temperature * 10. );
+#ifdef DALLAS_DEBUG
+            Serial.print( F( "pwiDallasSensor::measure() oneWirePin=" ));
+            Serial.print( this->oneWirePin );
+            Serial.print( F( ", temp=" ));
+            Serial.print( temperature );
+            Serial.print( F( ", itemp=" ));
+            Serial.println( itemp );
+#endif
+            if( itemp != -1270 && itemp != 850 ){
                 bool temp_changed = ( this->measures[i] != itemp );
                 changed |= temp_changed;
                 this->measures[i] = itemp;
@@ -149,6 +170,10 @@ bool pwiDallasSensor::measure()
  */
 void pwiDallasSensor::send()
 {
+#ifdef DALLAS_DEBUG
+    Serial.print( F( "pwiDallasSensor::send() oneWirePin=" ));
+    Serial.println( this->oneWirePin );
+#endif
     MyMessage msg;
     for( int i=0 ; i<this->device_count ; ++i ){
         float ftemp = this->measures[i] / 10.;
