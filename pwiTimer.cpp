@@ -82,16 +82,16 @@ unsigned long pwiTimer::getDelay( void )
 unsigned long pwiTimer::getRemaining( void )
 {
     unsigned long remaining = 0;
+    unsigned long duration = 0;
+    unsigned long now = millis();
     if( this->isRunnable()){
-        unsigned long duration = 0;
         if( this->isStarted()){
-            unsigned long now = millis();
             duration = now - this->start_ms;
         }
         remaining = this->delay_ms - duration;
     }
 #ifdef TIMER_DEBUG
-    Serial.print( F( "[pwiTimer::getRemaining] label=" ));
+    Serial.print( F( "pwiTimer::getRemaining() label=" ));
     Serial.print( this->label );
     Serial.print( F( ", delay_ms=" ));
     Serial.print( this->delay_ms );
@@ -228,7 +228,7 @@ void pwiTimer::start( void )
         }
     } else {
 #ifdef TIMER_DEBUG
-        Serial.print( F( "[pwiTimer::start] label=" ));
+        Serial.print( F( "pwiTimer::start() label=" ));
         Serial.print( this->label );
         Serial.println( F( ": unable to start the timer while delay is not set" ));
 #endif
@@ -312,13 +312,14 @@ void pwiTimer::loop( void )
         unsigned long duration = now - this->start_ms;
         if( duration >= this->delay_ms ){
 #ifdef TIMER_DEBUG
-            Serial.print( F( "[pwiTimer::objLoop] " ));
+            Serial.print( F( "pwiTimer::objLoop() " ));
+            Serial.print( F( "label=" ));
             if( strlen( this->label )){
-                Serial.print( F( "label=" ));
                 Serial.print( this->label );
-                Serial.print( ", " );
+            } else {
+                Serial.print( F( "''" ));
             }
-            Serial.print( F( "delay_ms=" ));
+            Serial.print( F( ", delay_ms=" ));
             Serial.print( this->delay_ms );
             Serial.print( F( ", start_ms=" ));
             Serial.print( this->start_ms );
