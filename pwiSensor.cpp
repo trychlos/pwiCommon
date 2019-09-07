@@ -10,6 +10,8 @@
  * pwi 2019- 5-27 v5 renamed to pwiSensor
  * pwi 2019- 9- 3 fix typo
  * pwi 2019- 9- 7 take a copy of the sensor label
+ *                new methods: getMaxPeriod(), getMinPeriod()
+ *                let sending the measure be forced
  */
 
 #include <core/MySensorsCore.h>
@@ -53,6 +55,30 @@ uint8_t pwiSensor::getId()
 }
 
 /**
+ * pwiSensor::getMaxPeriod:
+ *
+ * Returns: the period of the max timer (unchanged timeout).
+ *
+ * Public.
+ */
+unsigned long pwiSensor::getMaxPeriod()
+{
+    return( this->max_timer.getDelay());
+}
+
+/**
+ * pwiSensor::getMinPeriod:
+ *
+ * Returns: the period of the min timer (max frequency).
+ *
+ * Public.
+ */
+unsigned long pwiSensor::getMinPeriod()
+{
+    return( this->min_timer.getDelay());
+}
+
+/**
  * pwiSensor::isArmed:
  * 
  * Returns: %TRUE if the sensor is armed.
@@ -71,18 +97,19 @@ bool pwiSensor::isArmed()
 
 /**
  * pwiSensor::measureAndSend:
+ * @forced: whether the measure should be sent even if unchanged.
  *
  * Take the measure, sending the message if needed.
  * Reset timers as a side effect.
  *
  * Public.
  */
-void pwiSensor::measureAndSend()
+void pwiSensor::measureAndSend( bool force )
 {
     if( this->armed ){
         if( this->measureCb ){
             bool changed = this->measureCb( this->user_data );
-            if( changed && this->send_on_change ){
+            if(( changed && this->send_on_change ) || force ){
                 this->send();
                 this->max_timer.restart();
             }

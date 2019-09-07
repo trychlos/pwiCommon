@@ -37,6 +37,8 @@
  *                setup() takes first min, then max periods => breaks backward compatibility
  *                trigger() is renamed to measureAndSend()
  * pwi 2019- 9- 7 take a copy of the sensor label
+ *                new methods: getMaxPeriod(), getMinPeriod()
+ *                let sending the measure be forced
  */
 
 /* The prototype for the send callback function to be provided by the caller.
@@ -65,8 +67,10 @@ class pwiSensor {
     public:
                       pwiSensor();
         uint8_t       getId();
+        unsigned long getMaxPeriod();
+        unsigned long getMinPeriod();
         bool          isArmed();
-        void          measureAndSend();
+        void          measureAndSend( bool force=false );
         void          present( uint8_t id, uint8_t type, const char *label );
         void          send();
         void          setArmed( bool armed );
