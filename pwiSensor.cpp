@@ -12,6 +12,10 @@
  * pwi 2019- 9- 7 take a copy of the sensor label
  *                new methods: getMaxPeriod(), getMinPeriod()
  *                let sending the measure be forced
+ * pwi 2019- 9- 8 id and pin are construction-time data
+ *                remove unused send_on_change flag
+ *                remove setArmed() methods
+ *                all methods become virtual
  */
 
 #include <core/MySensorsCore.h>
@@ -24,22 +28,35 @@ static const char * const strMaxPeriodTimer = "MaxPeriodTimer";
 
 /**
  * pwiSensor::pwiSensor:
+ * @id: the child identifier inside of this MySensor node; must be unique for
+ *  this node.
+ * @pin: the pin number to which the physical device is attached.
  * 
  * Constructor.
  *
  * Public.
  */
-pwiSensor::pwiSensor( void )
+pwiSensor::pwiSensor( uint8_t id, uint8_t pin )
+{
+    this->init();
+
+    this->id = id;
+    this->pin = pin;
+}
+
+/*
+ * Private pwiSensor::init:
+ */
+void pwiSensor::init( void )
 {
     this->id = 0;
+    this->pin = 0;
+
     this->type = 0;
     memset( this->label, '\0', 1+MAX_PAYLOAD );
-    this->armed = false;
     this->sendCb = NULL;
   	this->measureCb = NULL;
-    this->send_on_change = true;
-
-    this->setArmed( true );
+    this->user_data = NULL;
 }
 
 /**
@@ -79,20 +96,15 @@ unsigned long pwiSensor::getMinPeriod()
 }
 
 /**
- * pwiSensor::isArmed:
+ * pwiSensor::getPin:
  * 
- * Returns: %TRUE if the sensor is armed.
- * 
- * If the sensor is not armed, no measure is taken.
- * In this case, the sent messages are ARMED=false, TRIPPED=false.
- *
- * At construction time, pwiSensor's default to be armed.
+ * Returns: the pin number to which the physical device is attached.
  *
  * Public.
  */
-bool pwiSensor::isArmed()
+uint8_t pwiSensor::getPin()
 {
-    return( this->armed );
+    return( this->pin );
 }
 
 /**
@@ -106,21 +118,17 @@ bool pwiSensor::isArmed()
  */
 void pwiSensor::measureAndSend( bool force )
 {
-    if( this->armed ){
-        if( this->measureCb ){
-            bool changed = this->measureCb( this->user_data );
-            if(( changed && this->send_on_change ) || force ){
-                this->send();
-                this->max_timer.restart();
-            }
+    if( this->measureCb ){
+        bool changed = this->measureCb( this->user_data );
+        if( changed || force ){
+            this->send();
+            this->max_timer.restart();
         }
     }
 }
 
 /**
  * pwiSensor::present:
- * @id: the child identifier inside of this MySensor node; must be unique inside
- *  of this node.
  * @type: the MySensor type of this child sensor.
  * @label: a qualifying label for this child sensor.
  *  A copy of the string is taken; the provided @label may so be safely freed by
@@ -135,17 +143,16 @@ void pwiSensor::measureAndSend( bool force )
  *
  * Public
  */
-void pwiSensor::present( uint8_t id, uint8_t type, const char *label )
+void pwiSensor::present( uint8_t type, const char *label )
 {
 #ifdef SENSOR_DEBUG
     Serial.print( F( "pwiSensor::present() id=" ));
-    Serial.print( id );
+    Serial.print( this->id );
     Serial.print( F( ", type=" ));
     Serial.print( type );
     Serial.print( F( ", label=" ));
     Serial.println( label );
 #endif
-    this->id = id;
     this->type = type;
     strncpy( this->label, label, MAX_PAYLOAD );
     ::present( this->id, this->type, this->label );
@@ -160,63 +167,10 @@ void pwiSensor::present( uint8_t id, uint8_t type, const char *label )
  */
 void pwiSensor::send()
 {
-    if( this->armed ){
-        if( this->sendCb ){
-            this->sendCb( this->user_data );
-            this->min_timer.restart();
-        }
+    if( this->sendCb ){
+        this->sendCb( this->user_data );
+        this->min_timer.restart();
     }
-}
-
-/**
- * pwiSensor::setArmed:
- * @armed: whether this sensor must be armed.
- *  As a reminder, only armed sensors take measure, and consequently send changes
- *  to the controller.
- *  As a side effect, unarming the sensor stops all the timers.
- * 
- * Arm/unarm the sensor.
- *
- * Public
- */
-void pwiSensor::setArmed( bool armed )
-{
-    this->armed = armed;
-    if( !armed ){
-        this->min_timer.stop();
-        this->max_timer.stop();
-    }
-}
-
-/**
- * pwiSensor::setArmed:
- * @payload: a string received from the controller, which is expected to be an
- *  arm or unarm command.
- *  Accepted strings are:
- *  'ARM=1': arm the sensor (take measures, send changes, and so on)
- *  'ARM=0': unarm the sensor, disabling all measures.
- *
- * Arm the sensor depending of a received message.
- *
- * Returns: %PWI_SENSOR_OK if the arm status has been successfully set, or the
- * error code.
- *
- * Public
- */
-uint8_t pwiSensor::setArmed( const char *payload )
-{
-    if( strncmp( payload, "ARM=", 4 ) != 0 ){
-        return( PWI_SENSOR_ERR03 );
-    }
-    if( strlen( payload ) != 5 ){
-        return( PWI_SENSOR_ERR03 );
-    }
-    char arg = payload[4];
-    if( arg != '0' && arg != '1' ){
-        return( PWI_SENSOR_ERR03 );
-    }
-    this->setArmed( arg == '1' );
-    return( PWI_SENSOR_OK );
 }
 
 /**
@@ -282,24 +236,6 @@ uint8_t pwiSensor::setMinPeriod( unsigned long delay_ms )
 }
 
 /**
- * pwiSensor::setSendOnChange:
- * @send: whether a message should be sent to the controller each time the
- *  measure changes.
- *  This is the default behavior set at construction time for all our sensor
- *  nodes.
- *  But, this should not be the case for alarm nodes, where the message must
- *  only be send after the expiration of the grace period.
- *
- * Configure the 'send on change' behavior.
- *
- * Public
- */
-void pwiSensor::setSendOnChange( bool send )
-{
-    this->send_on_change = send;
-}
-
-/**
  * pwiSensor::setup:
  * @min_period_ms: the min period, aka the max frequency, in ms.
  *  Only applies if greater than zero, the sensor is armed, and a @measureCb
@@ -315,6 +251,8 @@ void pwiSensor::setSendOnChange( bool send )
  * @measureCb: the callback function which takes the measure.
  * @sendCb: the callback function which sends the last measure to the controller.
  * @user_data: [allow-none]: the user data to be passed to the callbacks.
+ *  As callbacks are most often static methods, @user_data should be a pointer
+ *  to the sensor object.
  *
  * Configure the sensor.
  * 

@@ -39,6 +39,10 @@
  * pwi 2019- 9- 7 take a copy of the sensor label
  *                new methods: getMaxPeriod(), getMinPeriod()
  *                let sending the measure be forced
+ * pwi 2019- 9- 8 id and pin are construction-time data
+ *                remove unused send_on_change flag
+ *                remove setArmed() methods
+ *                all methods become virtual
  */
 
 /* The prototype for the send callback function to be provided by the caller.
@@ -65,35 +69,40 @@ enum {
 
 class pwiSensor {
     public:
-                      pwiSensor();
-        uint8_t       getId();
-        unsigned long getMaxPeriod();
-        unsigned long getMinPeriod();
-        bool          isArmed();
-        void          measureAndSend( bool force=false );
-        void          present( uint8_t id, uint8_t type, const char *label );
-        void          send();
-        void          setArmed( bool armed );
-        uint8_t       setArmed( const char *payload );
-        uint8_t       setMaxPeriod( unsigned long delay_ms );
-        uint8_t       setMinPeriod( unsigned long delay_ms );
-        void          setSendOnChange( bool send );
-        void          setup( unsigned long min_period_ms, unsigned long max_period_ms, pwiMeasureCb measureCb, pwiSendCb sendCb, void *user_data=NULL );
+                                  pwiSensor( uint8_t id, uint8_t pin=0 );
+        virtual uint8_t           getId();
+        virtual unsigned long     getMaxPeriod();
+        virtual unsigned long     getMinPeriod();
+        virtual uint8_t           getPin();
+        virtual void              measureAndSend( bool force=false );
+        virtual void              present( uint8_t type, const char *label );
+        virtual void              send();
+        virtual uint8_t           setMaxPeriod( unsigned long delay_ms );
+        virtual uint8_t           setMinPeriod( unsigned long delay_ms );
+        virtual void              setup( unsigned long min_period_ms, unsigned long max_period_ms, pwiMeasureCb measureCb, pwiSendCb sendCb, void *user_data=NULL );
 
     private:
-        uint8_t       id;
-        uint8_t       type;
-        char          label[1+MAX_PAYLOAD];
-        bool          armed;
-        bool          send_on_change;
-        pwiTimer      min_timer;                // min period, aka max frequency
-        pwiTimer      max_timer;                // max period, aka unchanged timeout
-        pwiMeasureCb  measureCb;
-        pwiSendCb     sendCb;
-        void         *user_data;
+        /* construction data
+         */
+                uint8_t           id;
+                uint8_t           pin;
 
-        static void   OnMinPeriodCb( pwiSensor *node);
-        static void   OnMaxPeriodCb( pwiSensor *node);
+        /* runtime data
+         */
+                uint8_t           type;
+                char              label[1+MAX_PAYLOAD];
+                pwiTimer          min_timer;                // min period, aka max frequency
+                pwiTimer          max_timer;                // max period, aka unchanged timeout
+                pwiMeasureCb      measureCb;
+                pwiSendCb         sendCb;
+                void             *user_data;
+
+        /* private methods
+         */
+                void              init();
+
+        static  void              OnMinPeriodCb( pwiSensor *node);
+        static  void              OnMaxPeriodCb( pwiSensor *node);
 };
 
 #endif // __PWI_SENSOR_H__
