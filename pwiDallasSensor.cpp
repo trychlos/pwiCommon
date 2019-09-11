@@ -5,10 +5,14 @@
  * pwi 2019- 9- 5 creation
  * pwi 2019- 9- 7 identify the sensor on its label rather than on its MySensor Id
  * pwi 2019- 9- 8 update pwiSensor base class
+ * pwi 2019- 9-11 update to removed pwiSensor::present() method
+ *                move constant strings to flash memory and keep them there
  */
 
 // uncomment to debugging this file
 //#define DALLAS_DEBUG
+
+static char const strLabel[] PROGMEM = "Temp sensor #";
 
 /**
  * pwiDallasSensor::pwiDallasSensor:
@@ -65,7 +69,7 @@ void pwiDallasSensor::before()
 /**
  * pwiDallasSensor::present:
  * 
- * Present each temperature sensor, with ID's from 10 to n.
+ * Present each temperature sensor, with ID's from this->getId() to n.
  *
  * Public.
  */
@@ -76,7 +80,6 @@ void pwiDallasSensor::present()
     Serial.print( F( "pwiDallasSensor::present() id=" ));
     Serial.println( id );
 #endif
-    String label = "Temperature sensor #";
     if( this->dallasBusInitialized ){
         //this->device_count = this->dallasTemperatureBus.getDeviceCount();
         this->device_count = this->dallasTemperatureBus.getDS18Count();
@@ -84,14 +87,11 @@ void pwiDallasSensor::present()
             this->device_count = PWI_DALLAS_SENSOR_MAX_ATTACHED;
         }
     }
+    char label[1+MAX_PAYLOAD];
     for( int i=0 ; i<this->device_count ; ++i ){
         int child_id = id+i;
-        String str = label + i;
-        if( i == 0 ){
-            dynamic_cast< pwiSensor& >( *this ).present( S_TEMP, str.c_str());
-        } else {
-            ::present( child_id, S_TEMP, str.c_str());
-        }
+        snprintf_P( label, sizeof( label ), PSTR( "%S%u" ), strLabel, i );
+        ::present( child_id, S_TEMP, label );
     }
 }
 
