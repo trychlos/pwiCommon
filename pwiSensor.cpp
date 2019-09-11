@@ -16,6 +16,9 @@
  *                remove unused send_on_change flag
  *                remove setArmed() methods
  *                all methods become virtual
+ * pwi 2019- 9-11 remove label
+ *                remove present() method
+ *                move constant strings to flash memory and keep them there
  */
 
 #include <core/MySensorsCore.h>
@@ -23,8 +26,8 @@
 // uncomment to debugging this file
 //#define SENSOR_DEBUG
 
-static const char * const strMinPeriodTimer = "MinPeriodTimer";
-static const char * const strMaxPeriodTimer = "MaxPeriodTimer";
+static char const strMinTimer[] PROGMEM = "MinTimer #";
+static char const strMaxTimer[] PROGMEM = "MaxTimer #";
 
 /**
  * pwiSensor::pwiSensor:
@@ -53,7 +56,6 @@ void pwiSensor::init( void )
     this->pin = 0;
 
     this->type = 0;
-    memset( this->label, '\0', 1+MAX_PAYLOAD );
     this->sendCb = NULL;
   	this->measureCb = NULL;
     this->user_data = NULL;
@@ -72,27 +74,27 @@ uint8_t pwiSensor::getId()
 }
 
 /**
- * pwiSensor::getMaxPeriod:
+ * pwiSensor::getMaxTimer:
  *
- * Returns: the period of the max timer (unchanged timeout).
+ * Returns: a reference to the max timer (unchanged timeout).
  *
  * Public.
  */
-unsigned long pwiSensor::getMaxPeriod()
+pwiTimer &pwiSensor::getMaxTimer()
 {
-    return( this->max_timer.getDelay());
+    return( this->max_timer );
 }
 
 /**
- * pwiSensor::getMinPeriod:
+ * pwiSensor::getMinTimer:
  *
- * Returns: the period of the min timer (max frequency).
+ * Returns: a reference to the min timer (max frequency).
  *
  * Public.
  */
-unsigned long pwiSensor::getMinPeriod()
+pwiTimer &pwiSensor::getMinTimer()
 {
-    return( this->min_timer.getDelay());
+    return( this->min_timer );
 }
 
 /**
@@ -125,37 +127,6 @@ void pwiSensor::measureAndSend( bool force )
             this->max_timer.restart();
         }
     }
-}
-
-/**
- * pwiSensor::present:
- * @type: the MySensor type of this child sensor.
- * @label: a qualifying label for this child sensor.
- *  A copy of the string is taken; the provided @label may so be safely freed by
- *  the caller after this function returns.
- *
- * Present the node to the controller.
- * This also may be done directly by the main program, but this method lets the
- * object take a copy of some characteristics of the sensor node, and these data
- * may be usefully used in debug messages.
- *
- * So this method is just for having readable debug messages.
- *
- * Public
- */
-void pwiSensor::present( uint8_t type, const char *label )
-{
-#ifdef SENSOR_DEBUG
-    Serial.print( F( "pwiSensor::present() id=" ));
-    Serial.print( this->id );
-    Serial.print( F( ", type=" ));
-    Serial.print( type );
-    Serial.print( F( ", label=" ));
-    Serial.println( label );
-#endif
-    this->type = type;
-    strncpy( this->label, label, MAX_PAYLOAD );
-    ::present( this->id, this->type, this->label );
 }
 
 /**
@@ -200,7 +171,9 @@ uint8_t pwiSensor::setMaxPeriod( unsigned long delay_ms )
         return( PWI_SENSOR_ERR01 );
     }
 	// delay_ms may be zero
-    this->max_timer.setup( strMaxPeriodTimer, delay_ms, false, pwiSensor::OnMaxPeriodCb, this );
+    char label[1+MAX_PAYLOAD];
+    snprintf_P( label, sizeof( label ), PSTR( "%S%u" ), strMaxTimer, this->getId());
+    this->max_timer.setup( label, delay_ms, false, pwiSensor::OnMaxPeriodCb, this );
     this->max_timer.start();
     return( PWI_SENSOR_OK );
 }
@@ -230,7 +203,9 @@ uint8_t pwiSensor::setMinPeriod( unsigned long delay_ms )
         return( PWI_SENSOR_ERR02 );
     }
 	// delay_ms may be zero
-    min_timer.setup( strMinPeriodTimer, delay_ms, false, pwiSensor::OnMinPeriodCb, this );
+    char label[1+MAX_PAYLOAD];
+    snprintf_P( label, sizeof( label ), PSTR( "%S%u" ), strMinTimer, this->getId());
+    min_timer.setup( label, delay_ms, false, pwiSensor::OnMinPeriodCb, this );
     this->min_timer.start();
     return( PWI_SENSOR_OK );
 }

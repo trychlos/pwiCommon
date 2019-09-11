@@ -21,9 +21,9 @@
  *
  * Usage synopsys:
  * a) define the sensor variable:
- *    pwiSensor mySensor;
+ *    pwiSensor mySensor( id, pin );
  * b) present the sensor to the controller:
- *    mySensor.present( id, type, label );
+ *    mySensor.present( type, label );
  * c) configure the sensor:
  *    mySensor.setup( min_period, max_period, measure_cb, send_cb, user_data );
  *
@@ -43,6 +43,8 @@
  *                remove unused send_on_change flag
  *                remove setArmed() methods
  *                all methods become virtual
+ * pwi 2019- 9-11 remove label
+ *                remove present() method
  */
 
 /* The prototype for the send callback function to be provided by the caller.
@@ -63,19 +65,17 @@ typedef bool ( *pwiMeasureCb )( void * );
 enum {
     PWI_SENSOR_OK = 0,
     PWI_SENSOR_ERR01,                           // max period greater than zero, but smaller than min period
-    PWI_SENSOR_ERR02,                           // min period greater than max period (and max period is set)
-    PWI_SENSOR_ERR03                            // invalid ARM command, 'ARM=0|1' expected
+    PWI_SENSOR_ERR02                            // min period greater than max period (and max period is set)
 };
 
 class pwiSensor {
     public:
                                   pwiSensor( uint8_t id, uint8_t pin=0 );
         virtual uint8_t           getId();
-        virtual unsigned long     getMaxPeriod();
-        virtual unsigned long     getMinPeriod();
+        virtual pwiTimer         &getMaxTimer( void );
+        virtual pwiTimer         &getMinTimer( void );
         virtual uint8_t           getPin();
         virtual void              measureAndSend( bool force=false );
-        virtual void              present( uint8_t type, const char *label );
         virtual void              send();
         virtual uint8_t           setMaxPeriod( unsigned long delay_ms );
         virtual uint8_t           setMinPeriod( unsigned long delay_ms );
@@ -90,7 +90,6 @@ class pwiSensor {
         /* runtime data
          */
                 uint8_t           type;
-                char              label[1+MAX_PAYLOAD];
                 pwiTimer          min_timer;                // min period, aka max frequency
                 pwiTimer          max_timer;                // max period, aka unchanged timeout
                 pwiMeasureCb      measureCb;
