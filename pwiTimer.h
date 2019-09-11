@@ -47,42 +47,42 @@ typedef void ( *pwiTimerCb )( void * );
 
 class pwiTimer {
     public:
-                      pwiTimer( void );
-        void          dump( void );
-        unsigned long getDelay();
-        unsigned long getRemaining();
-        bool          isRunnable();
-        bool          isStarted();
-        void          restart( void );
-        void          setDelay( unsigned long delay_ms );
-        void          setup( const char *label, unsigned long delay_ms, bool once=true, pwiTimerCb cb=NULL, void *user_data=NULL );
-        void          start( void );
-        void          stop( void );
+                                  pwiTimer( void );
+        virtual void              dump( void );
+        virtual unsigned long     getDelay();
+        virtual unsigned long     getRemaining();
+        virtual bool              isRunnable();
+        virtual bool              isStarted();
+        virtual void              restart( void );
+        virtual void              setDelay( unsigned long delay_ms );
+        virtual void              setup( const char *label, unsigned long delay_ms, bool once=true, pwiTimerCb cb=NULL, void *user_data=NULL );
+        virtual void              start( void );
+        virtual void              stop( void );
 
-        static void   Dump();
-        static void   Loop();
+        static  void              Dump();
+        static  void              Loop();
 
     private:
         /* configuration data
          * see setup()
          */
-        const char   *label;
-        unsigned long delay_ms;
-        bool          once;
-        pwiTimerCb    cb;
-        void         *user_data;
+                const char       *label;
+                unsigned long     delay_ms;
+                bool              once;
+                pwiTimerCb        cb;
+                void             *user_data;
 
         /* runtime data
          * @start_ms: startup timestamp.
          *  =0 timer not started
          *  >0 timestamp of the timer startup.
 		 */
-        unsigned long start_ms;
+                unsigned long     start_ms;
 
-        static void   DumpCb( pwiTimer *timer, void *user_data );
-        static void   LoopCb( pwiTimer *timer, void *user_data );
+        static  void              DumpCb( pwiTimer *timer, void *user_data );
+        static  void              LoopCb( pwiTimer *timer, void *user_data );
 
-               void   loop();
+                void              loop();
 };
 
 #endif // __PWI_TIMER_H__

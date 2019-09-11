@@ -202,6 +202,21 @@ void pwiTimer::setDelay( unsigned long delay_ms )
  */
 void pwiTimer::setup( const char *label, unsigned long delay_ms, bool once, pwiTimerCb cb, void *user_data )
 {
+#ifdef TIMER_DEBUG
+    char stemp[7];
+    Serial.print( F( "pwiTimer::setup() label='" ));
+    Serial.print( label );
+    Serial.print( F( "', delay_ms=" ));
+    Serial.print( delay_ms );
+    Serial.print( F( ", once=" ));
+    Serial.print( once );
+    Serial.print( F( ", cb=0x" ));
+    sprintf( stemp, "%4.4x", ( int ) cb );
+    Serial.print( stemp );
+    Serial.print( F( ", user_data=0x" ));
+    sprintf( stemp, "%4.4x", ( int ) user_data);
+    Serial.println( stemp );
+#endif
     this->label = label;
     this->setDelay( delay_ms );
     this->once = once;
