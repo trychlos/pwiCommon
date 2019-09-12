@@ -7,6 +7,8 @@
  * pwi 2019- 9- 8 update pwiSensor base class
  * pwi 2019- 9-11 update to removed pwiSensor::present() method
  *                move constant strings to flash memory and keep them there
+ * pwi 2019- 9-12 v190902
+ *                replace int with uint8_t
  */
 
 // uncomment to debugging this file
@@ -37,7 +39,7 @@ void pwiDallasSensor::init( void )
     this->dallasBusInitialized = false;
     this->device_count = 0;
 
-    for( int i=0 ; i<PWI_DALLAS_SENSOR_MAX_ATTACHED ; ++i ){
+    for( uint8_t i=0 ; i<PWI_DALLAS_SENSOR_MAX_ATTACHED ; ++i ){
         this->measures[i] = 0;
     }
 }
@@ -88,8 +90,8 @@ void pwiDallasSensor::present()
         }
     }
     char label[1+MAX_PAYLOAD];
-    for( int i=0 ; i<this->device_count ; ++i ){
-        int child_id = id+i;
+    for( uint8_t i=0 ; i<this->device_count ; ++i ){
+        uint8_t child_id = id+i;
         snprintf_P( label, sizeof( label ), PSTR( "%S%u" ), strLabel, i );
         ::present( child_id, S_TEMP, label );
     }
@@ -132,7 +134,7 @@ bool pwiDallasSensor::measure()
         //wait( conversionTime );
     
         // Fetch and round temperature to one decimal
-        for( int i=0 ; i<this->device_count ; i++ ){
+        for( uint8_t i=0 ; i<this->device_count ; i++ ){
             float temperature = this->dallasTemperatureBus.getTempCByIndex(i);
             int itemp = ( int )( temperature * 10. );
 #ifdef DALLAS_DEBUG
@@ -166,7 +168,7 @@ void pwiDallasSensor::send()
     Serial.println( id );
 #endif
     MyMessage msg;
-    for( int i=0 ; i<this->device_count ; ++i ){
+    for( uint8_t i=0 ; i<this->device_count ; ++i ){
         float ftemp = this->measures[i] / 10.;
         msg.clear();
         ::send( msg.setSensor( id+i ).setType( V_TEMP ).set( ftemp, 1 ));
