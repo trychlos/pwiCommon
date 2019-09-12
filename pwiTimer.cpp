@@ -1,5 +1,6 @@
 #include "pwiTimer.h"
 #include <pwiList.h>
+#include "toHex.h"
 
 /*
  * pwi 2017- 5-20 v3 add getRemaining() method
@@ -11,6 +12,8 @@
  *                remove untilNow() function
  *                see https://arduino.stackexchange.com/questions/12587/how-can-i-handle-the-millis-rollover
  * pwi 2019- 9- 5 use new pwiList class
+ * pwi 2019- 9-12 v190902
+ *                identify the timer by its address using new getHex16() function
  */
 
 // uncomment to debugging this file
@@ -91,8 +94,8 @@ unsigned long pwiTimer::getRemaining( void )
         remaining = this->delay_ms - duration;
     }
 #ifdef TIMER_DEBUG
-    Serial.print( F( "pwiTimer::getRemaining() label=" ));
-    Serial.print( this->label );
+    Serial.print( F( "pwiTimer::getRemaining() this=" ));
+    Serial.print( toHex16( this ));
     Serial.print( F( ", delay_ms=" ));
     Serial.print( this->delay_ms );
     Serial.print( F( ", start_ms=" ));
@@ -203,19 +206,18 @@ void pwiTimer::setDelay( unsigned long delay_ms )
 void pwiTimer::setup( const char *label, unsigned long delay_ms, bool once, pwiTimerCb cb, void *user_data )
 {
 #ifdef TIMER_DEBUG
-    char stemp[7];
-    Serial.print( F( "pwiTimer::setup() label='" ));
+    Serial.print( F( "pwiTimer::setup() this=" ));
+    Serial.print( toHex16( this ));
+    Serial.print( F( ", label='" ));
     Serial.print( label );
     Serial.print( F( "', delay_ms=" ));
     Serial.print( delay_ms );
     Serial.print( F( ", once=" ));
     Serial.print( once );
-    Serial.print( F( ", cb=0x" ));
-    sprintf( stemp, "%4.4x", ( int ) cb );
-    Serial.print( stemp );
-    Serial.print( F( ", user_data=0x" ));
-    sprintf( stemp, "%4.4x", ( int ) user_data);
-    Serial.println( stemp );
+    Serial.print( F( ", cb=" ));
+    Serial.print( toHex16( cb ));
+    Serial.print( F( ", user_data=" ));
+    Serial.println( toHex16( user_data ));
 #endif
     this->label = label;
     this->setDelay( delay_ms );
@@ -243,8 +245,8 @@ void pwiTimer::start( void )
         }
     } else {
 #ifdef TIMER_DEBUG
-        Serial.print( F( "pwiTimer::start() label=" ));
-        Serial.print( this->label );
+        Serial.print( F( "pwiTimer::start() this=" ));
+        Serial.print( toHex16( this ));
         Serial.println( F( ": unable to start the timer while delay is not set" ));
 #endif
         this->stop();
@@ -327,13 +329,8 @@ void pwiTimer::loop( void )
         unsigned long duration = now - this->start_ms;
         if( duration >= this->delay_ms ){
 #ifdef TIMER_DEBUG
-            Serial.print( F( "pwiTimer::objLoop() " ));
-            Serial.print( F( "label=" ));
-            if( strlen( this->label )){
-                Serial.print( this->label );
-            } else {
-                Serial.print( F( "''" ));
-            }
+            Serial.print( F( "pwiTimer::objLoop() this=" ));
+            Serial.print( toHex16( this ));
             Serial.print( F( ", delay_ms=" ));
             Serial.print( this->delay_ms );
             Serial.print( F( ", start_ms=" ));
