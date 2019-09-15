@@ -19,6 +19,8 @@
  *
  * pwi 2019- 9- 5 creation
  * pwi 2019- 9- 8 update pwiSensor base class
+ * pwi 2019- 9-15 v190903
+ *                new method getDevicesCount()
  */
 
 #define PWI_DALLAS_SENSOR_MAX_ATTACHED   5
@@ -27,6 +29,7 @@ class pwiDallasSensor : public pwiSensor {
     public:
                                   pwiDallasSensor( uint8_t id, uint8_t pin );
                 void              before();
+        virtual uint8_t           getDevicesCount( void );
         virtual void              present();
         virtual void              setup();
 

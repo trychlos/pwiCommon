@@ -9,6 +9,8 @@
  *                move constant strings to flash memory and keep them there
  * pwi 2019- 9-12 v190902
  *                replace int with uint8_t
+ * pwi 2019- 9-15 v190903
+ *                new method getDevicesCount()
  */
 
 // uncomment to debugging this file
@@ -66,6 +68,18 @@ void pwiDallasSensor::before()
         this->dallasTemperatureBus.setWaitForConversion( false );
         this->dallasBusInitialized = true;
     }
+}
+
+/**
+ * pwiDallasSensor::getDevicesCount:
+ * 
+ * Returns: the count of DS18B20devices.
+ *
+ * Public.
+ */
+uint8_t pwiDallasSensor::getDevicesCount()
+{
+    return( this->device_count );
 }
 
 /**
