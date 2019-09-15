@@ -19,6 +19,9 @@
  * pwi 2019- 9-11 remove label
  *                remove present() method
  *                move constant strings to flash memory and keep them there
+ * pwi 2019- 9-15 v190904
+ *                define an empty constructor
+ *                new setId() method
  */
 
 #include <core/MySensorsCore.h>
@@ -39,6 +42,11 @@ static char const strMaxTimer[] PROGMEM = "MaxTimer #";
  *
  * Public.
  */
+pwiSensor::pwiSensor( void )
+{
+    this->init();
+}
+
 pwiSensor::pwiSensor( uint8_t id, uint8_t pin )
 {
     this->init();
@@ -142,6 +150,20 @@ void pwiSensor::send()
         this->sendCb( this->user_data );
         this->min_timer.restart();
     }
+}
+
+/**
+ * pwiSensor::setId:
+ * @id: the child identifier inside of this MySensor node; must be unique for
+ *  this node.
+ *
+ * Set the child sensor identifier.
+ *
+ * Public
+ */
+void pwiSensor::setId( uint8_t id )
+{
+    this->id = id;
 }
 
 /**

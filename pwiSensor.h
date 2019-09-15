@@ -45,6 +45,9 @@
  *                all methods become virtual
  * pwi 2019- 9-11 remove label
  *                remove present() method
+ * pwi 2019- 9-15 v190904
+ *                define an empty constructor
+ *                new setId() method
  */
 
 /* The prototype for the send callback function to be provided by the caller.
@@ -70,6 +73,7 @@ enum {
 
 class pwiSensor {
     public:
+                                  pwiSensor( void );
                                   pwiSensor( uint8_t id, uint8_t pin=0 );
         virtual uint8_t           getId();
         virtual pwiTimer         &getMaxTimer( void );
@@ -77,6 +81,7 @@ class pwiSensor {
         virtual uint8_t           getPin();
         virtual void              measureAndSend( bool force=false );
         virtual void              send();
+        virtual void              setId( uint8_t id );
         virtual uint8_t           setMaxPeriod( unsigned long delay_ms );
         virtual uint8_t           setMinPeriod( unsigned long delay_ms );
         virtual void              setup( unsigned long min_period_ms, unsigned long max_period_ms, pwiMeasureCb measureCb, pwiSendCb sendCb, void *user_data=NULL );
