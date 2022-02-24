@@ -2,6 +2,7 @@
 #define __PWI_TIMER_H__
 
 #include <Arduino.h>
+#include <pwiList.h>
 
 /*
  * This is a very simple timer which let us trigger a function at the end
@@ -37,6 +38,9 @@
  * pwi 2019- 5-27 v5 renamed to pwiTimer
  * pwi 2019- 6- 3 v6 improve resetting the timer delay
  * pwi 2019- 9- 4 getDelay() new method
+ * pwi 2019-10-14 v101002
+ *                 pwiList becomes a static class member
+ *                 introduce getType() method
  */
 
 /* The prototype for the timer callback function to be provided by the caller.
@@ -47,42 +51,54 @@ typedef void ( *pwiTimerCb )( void * );
 
 class pwiTimer {
     public:
-                                  pwiTimer( void );
-        virtual void              dump( void );
-        virtual unsigned long     getDelay();
-        virtual unsigned long     getRemaining();
-        virtual bool              isRunnable();
-        virtual bool              isStarted();
-        virtual void              restart( void );
-        virtual void              setDelay( unsigned long delay_ms );
-        virtual void              setup( const char *label, unsigned long delay_ms, bool once=true, pwiTimerCb cb=NULL, void *user_data=NULL );
-        virtual void              start( void );
-        virtual void              stop( void );
+                                    pwiTimer( void );
+        virtual   void              dump( void );
+        virtual   unsigned long     getDelay();
+        virtual   unsigned long     getRemaining();
+        virtual   const char       *getType();
+        virtual   bool              isRunnable();
+        virtual   bool              isStarted();
+        virtual   void              restart( void );
+        virtual   void              setDelay( unsigned long delay_ms );
+        virtual   void              setup( const char *label, unsigned long delay_ms, bool once=true, pwiTimerCb cb=NULL, void *user_data=NULL );
+        virtual   void              start( void );
+        virtual   void              stop( void );
 
-        static  void              Dump();
-        static  void              Loop();
+        /* static methods
+         */
+        static    void              Dump();
+        static    void              Loop( const char *type=NULL );
 
     private:
         /* configuration data
          * see setup()
          */
-                const char       *label;
-                unsigned long     delay_ms;
-                bool              once;
-                pwiTimerCb        cb;
-                void             *user_data;
+                  const char       *label;
+                  unsigned long     delay_ms;
+                  bool              once;
+                  pwiTimerCb        cb;
+                  void             *user_data;
 
         /* runtime data
          * @start_ms: startup timestamp.
          *  =0 timer not started
          *  >0 timestamp of the timer startup.
 		 */
-                unsigned long     start_ms;
+        volatile  unsigned long     start_ms;
 
-        static  void              DumpCb( pwiTimer *timer, void *user_data );
-        static  void              LoopCb( pwiTimer *timer, void *user_data );
+        /* methods
+         */
+                  void              loop( const char *type );
 
-                void              loop();
+        /* static data
+         */
+        static    pwiList           list;
+        static    const char       *className;
+
+        /* static methods
+         */
+        static    void              DumpCb( pwiTimer *timer, void *user_data );
+        static    void              LoopCb( pwiTimer *timer, const char *type );
 };
 
 #endif // __PWI_TIMER_H__

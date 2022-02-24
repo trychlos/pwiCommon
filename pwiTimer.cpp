@@ -1,6 +1,5 @@
 #include "pwiTimer.h"
-#include <pwiList.h>
-#include "toHex.h"
+#include <toHex.h>
 
 /*
  * pwi 2017- 5-20 v3 add getRemaining() method
@@ -9,18 +8,23 @@
  * pwi 2019- 5-27 v5 renamed to pwiTimer
  * pwi 2019- 6- 3 v6 improve resetting the timer delay
  * pwi 2019- 9- 4 getDelay() new method
- *                remove untilNow() function
- *                see https://arduino.stackexchange.com/questions/12587/how-can-i-handle-the-millis-rollover
+ *                 remove untilNow() function
+ *                 see https://arduino.stackexchange.com/questions/12587/how-can-i-handle-the-millis-rollover
  * pwi 2019- 9- 5 use new pwiList class
  * pwi 2019- 9-12 v190902
- *                identify the timer by its address using new getHex16() function
+ *                 identify the timer by its address using new getHex16() function
+ * pwi 2019-10-14 v191002
+ *                 convert to pwiTimer2 base class
  */
 
 // uncomment to debugging this file
 //#define TIMER_DEBUG
 
 // single linked list of allocated pwiTimer's
-static pwiList st_list;
+static pwiList     pwiTimer::list;
+
+// this class name
+static const char *pwiTimer::className = "pwiTimer";
 
 /**
  * pwiTimer::pwiTimer:
@@ -45,7 +49,7 @@ pwiTimer::pwiTimer( void )
 
     /* keep a single linked list of allocated pwiTimer's
      */
-    st_list.add( this );
+    pwiTimer::list.add( this );
 }
 
 /**
@@ -87,19 +91,23 @@ unsigned long pwiTimer::getRemaining( void )
     unsigned long remaining = 0;
     unsigned long duration = 0;
     unsigned long now = millis();
+    noInterrupts();
+    unsigned long start_ms = this->start_ms;
+    interrupts();
     if( this->isRunnable()){
         if( this->isStarted()){
-            duration = now - this->start_ms;
+            duration = now - start_ms;
         }
         remaining = this->delay_ms - duration;
     }
 #ifdef TIMER_DEBUG
-    Serial.print( F( "pwiTimer::getRemaining() this=" ));
+    Serial.print( this->getType());
+    Serial.print( F( "::getRemaining() this=" ));
     Serial.print( toHex16( this ));
     Serial.print( F( ", delay_ms=" ));
     Serial.print( this->delay_ms );
     Serial.print( F( ", start_ms=" ));
-    Serial.print( this->start_ms );
+    Serial.print( start_ms );
     Serial.print( F( ", now=" ));
     Serial.print( now );
     Serial.print( F( ", duration=" ));
@@ -108,6 +116,22 @@ unsigned long pwiTimer::getRemaining( void )
     Serial.println( remaining );
 #endif
     return( remaining );
+}
+
+/**
+ * pwiTimer::getType:
+ *
+ * Returns: the object type name (aka the class label).
+ *
+ * This is rather a work-around because Arduino compiles the code with the
+ * '-fno-rtti' option, which prevents us to be able to make use of the typeid()
+ * standard C++ method.
+ *
+ * Public.
+ */
+const char *pwiTimer::getType( void )
+{
+	return( pwiTimer::className );
 }
 
 /**
@@ -131,7 +155,10 @@ bool pwiTimer::isRunnable( void )
  */
 bool pwiTimer::isStarted( void )
 {
-    return( this->start_ms > 0 );
+    noInterrupts();
+    unsigned long ms = this->start_ms;
+    interrupts();
+    return( ms > 0 );
 }
 
 /**
@@ -206,7 +233,8 @@ void pwiTimer::setDelay( unsigned long delay_ms )
 void pwiTimer::setup( const char *label, unsigned long delay_ms, bool once, pwiTimerCb cb, void *user_data )
 {
 #ifdef TIMER_DEBUG
-    Serial.print( F( "pwiTimer::setup() this=" ));
+    Serial.print( this->getType());
+    Serial.print( F( "::setup() this=" ));
     Serial.print( toHex16( this ));
     Serial.print( F( ", label='" ));
     Serial.print( label );
@@ -238,13 +266,16 @@ void pwiTimer::setup( const char *label, unsigned long delay_ms, bool once, pwiT
 void pwiTimer::start( void )
 {
     if( this->isRunnable()){
+        noInterrupts();
         this->start_ms = millis();
         // manage the millis() rollover to make sure start_ms is not zero
         if( this->start_ms == 0 ){
             this->start_ms += 1;
         }
+        interrupts();
     } else {
 #ifdef TIMER_DEBUG
+        Serial.print( this->getType());
         Serial.print( F( "pwiTimer::start() this=" ));
         Serial.print( toHex16( this ));
         Serial.println( F( ": unable to start the timer while delay is not set" ));
@@ -262,7 +293,9 @@ void pwiTimer::start( void )
  */
 void pwiTimer::stop( void )
 {
+    noInterrupts();
     this->start_ms = 0;
+    interrupts();
 }
 
 /**
@@ -274,7 +307,7 @@ void pwiTimer::stop( void )
  */
 void pwiTimer::Dump( void )
 {
-    st_list.iter( pwiTimer::DumpCb );
+    pwiTimer::list.iter( pwiTimer::DumpCb );
 }
 
 /**
@@ -284,9 +317,68 @@ void pwiTimer::Dump( void )
  * 
  * Public Static.
  */
-void pwiTimer::Loop( void )
+void pwiTimer::Loop(  const char *type /*=NULL*/ )
 {
-    st_list.iter( pwiTimer::LoopCb );
+    pwiTimer::list.iter( pwiTimer::LoopCb, type );
+}
+
+/**
+ * pwiTimer::loop:
+ * @type: the type name which was requested when calling the pwiTimer::Loop()
+ *  public static method.
+ *  If null, then only addresses the pwiTimer objects.
+ *  Else, only addresses the named instances.
+ * 
+ * Check the pwiTimer element for expiration of the @delay_ms.
+ * 
+ * Private.
+ */
+void pwiTimer::loop( const char *type )
+{
+    const char *obj_type = this->getType();
+    if(( !type && !strcmp( obj_type, pwiTimer::className )) || ( type && !strcmp( obj_type, type ))){
+#ifdef TIMER_DEBUG
+        Serial.print( this->getType());
+        Serial.print( F( "::loop() this=" ));
+        Serial.print( toHex16( this ));
+        Serial.print( F( ", delay_ms=" ));
+        Serial.print( this->delay_ms );
+#endif
+        if( this->isStarted()){
+            unsigned long now = millis();
+            noInterrupts();
+            unsigned long start_ms = this->start_ms;
+            interrupts();
+            unsigned long duration = now - start_ms;
+#ifdef TIMER_DEBUG
+            Serial.print( F( ", start_ms=" ));
+            Serial.print( start_ms );
+            Serial.print( F( ", duration=" ));
+            Serial.print( duration );
+#endif
+            if( duration >= this->delay_ms ){
+#ifdef TIMER_DEBUG
+                Serial.println( F( " triggered" ));
+#endif
+                if( this->cb ){
+                    this->cb( this->user_data );
+                }
+                if( this->once ){
+                    this->stop();
+                } else {
+                    this->restart();
+                }
+#ifdef TIMER_DEBUG
+            } else {
+                Serial.println( F( " not yet reached" ));
+#endif
+            }
+#ifdef TIMER_DEBUG
+        } else {
+            Serial.println( F( " not started" ));
+#endif
+        }
+    }
 }
 
 /**
@@ -310,43 +402,8 @@ void pwiTimer::DumpCb( pwiTimer *timer, void *user_data )
  * 
  * Private Static.
  */
-void pwiTimer::LoopCb( pwiTimer *timer, void *user_data )
+void pwiTimer::LoopCb( pwiTimer *timer, const char *type )
 {
-    timer->loop();
-}
-
-/**
- * pwiTimer::loop:
- * 
- * Check the pwiTimer element for expiration of the @delay_ms.
- * 
- * Private.
- */
-void pwiTimer::loop( void )
-{
-    if( this->isStarted()){
-        unsigned long now = millis();
-        unsigned long duration = now - this->start_ms;
-        if( duration >= this->delay_ms ){
-#ifdef TIMER_DEBUG
-            Serial.print( F( "pwiTimer::objLoop() this=" ));
-            Serial.print( toHex16( this ));
-            Serial.print( F( ", delay_ms=" ));
-            Serial.print( this->delay_ms );
-            Serial.print( F( ", start_ms=" ));
-            Serial.print( this->start_ms );
-            Serial.print( F( ", duration=" ));
-            Serial.println( duration );
-#endif
-            if( this->cb ){
-                this->cb( this->user_data );
-            }
-            if( this->once ){
-                this->stop();
-            } else {
-                this->restart();
-            }
-        }
-    }
+    timer->loop( type );
 }
 

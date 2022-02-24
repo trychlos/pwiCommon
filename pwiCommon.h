@@ -3,6 +3,8 @@
 
 /*
  * pwi 2019-10- 5 v191001 creation
+ * pwi 2019-10-14 v191002
+ *                 get rid of <drivers/Linux/Arduino.h> include file
  */
 
 /*
@@ -12,7 +14,7 @@
  *  sendSketchInfo( PGMSTR( myString ));
  */
 #ifndef PGMSTR
-#include <drivers/Linux/Arduino.h>
+//#include <drivers/Linux/Arduino.h>
 #define PGMSTR(x) (( const __FlashStringHelper *) x)
 #endif
 
