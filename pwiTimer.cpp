@@ -1,6 +1,3 @@
-#include "pwiTimer.h"
-#include <toHex.h>
-
 /*
  * pwi 2017- 5-20 v3 add getRemaining() method
  * pwi 2019- 5-25 v4 remove start() with argument method
@@ -17,7 +14,10 @@
  *                 convert to pwiTimer2 base class
  */
 
-// uncomment to debugging this file
+#include "pwiTimer.h"
+#include <toHex.h>
+ 
+ // uncomment to debugging this file
 //#define TIMER_DEBUG
 
 // single linked list of allocated pwiTimer's

@@ -1,9 +1,6 @@
 #ifndef __PWI_TIMER_H__
 #define __PWI_TIMER_H__
 
-#include <Arduino.h>
-#include <pwiList.h>
-
 /*
  * This is a very simple timer which let us trigger a function at the end
  * of a predefined delay.
@@ -27,7 +24,7 @@
  * At end of the predefined delay, the callback will be called with
  * the passed-in user data.
  *
- * This simplissim timer relies on being repeatedly called by the main loop.
+ * This simplissime timer relies on being repeatedly called by the main loop.
  *
  * Note: the class does not provide any free/remove primitive in order to keep
  *  it as simple as possible.
@@ -42,6 +39,9 @@
  *                 pwiList becomes a static class member
  *                 introduce getType() method
  */
+
+#include <Arduino.h>
+#include <pwiList.h>
 
 /* The prototype for the timer callback function to be provided by the caller.
    This function receives the 'user_data' parameter provided at setup() time.
