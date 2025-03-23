@@ -4,6 +4,7 @@
  * Impulsions can be detected on falling or rising edge.
  * 
  * pwi 2025- 3-22 creation
+ * pwi 2025- 3-23 initialize input pin mode and state
  */
 
 #include "pwiPulseSensor.h"
@@ -24,8 +25,8 @@ pwiPulseSensor::pwiPulseSensor( uint8_t id, uint8_t input_pin, uint8_t edge )
 {
 	this->init();
 	this->setId( id );
-	this->input_pin = input_pin;
-	this->edge = edge;
+	this->setInputPin( input_pin );
+	this->setEdge( edge );
 }
 
 void pwiPulseSensor::init()
@@ -86,6 +87,10 @@ void pwiPulseSensor::setEdge( uint8_t edge )
 void pwiPulseSensor::setInputPin( uint8_t input_pin )
 {
     this->input_pin = input_pin;
+	if( input_pin ){
+		digitalWrite( input_pin, HIGH );
+		pinMode( input_pin, INPUT );
+	}
 }
 
 /**
