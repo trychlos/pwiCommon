@@ -5,12 +5,13 @@
  * 
  * pwi 2025- 3-22 creation
  * pwi 2025- 3-23 initialize input pin mode and state
+ * pwi 2025- 7-31 add bounce protection
  */
 
 #include "pwiPulseSensor.h"
 
 // uncomment to debugging this file
-#define SENSOR_DEBUG
+//#define SENSOR_DEBUG
 
 /*
  * Constructor
@@ -37,6 +38,7 @@ void pwiPulseSensor::init()
 	// runtime
 	this->last_state = 0;
 	this->imp_count = 0;
+	this->last_ms = 0;
 }
 
 /**
@@ -50,16 +52,6 @@ uint8_t pwiPulseSensor::getEdge()
 }
 
 /**
- * pwiPulseSensor::getImpulsionsCount():
- * 
- * Public
- */
-uint32_t pwiPulseSensor::getImpulsionsCount()
-{
-    return( this->imp_count );
-}
-
-/**
  * pwiPulseSensor::getInputPin():
  * 
  * Public
@@ -67,6 +59,16 @@ uint32_t pwiPulseSensor::getImpulsionsCount()
 uint8_t pwiPulseSensor::getInputPin()
 {
     return( this->input_pin );
+}
+
+/**
+ * pwiPulseSensor::getPulsesCount():
+ * 
+ * Public
+ */
+uint32_t pwiPulseSensor::getPulsesCount()
+{
+    return( this->imp_count );
 }
 
 /**
@@ -94,26 +96,47 @@ void pwiPulseSensor::setInputPin( uint8_t input_pin )
 }
 
 /**
- * pwiPulseSensor::loopInput():
- * 
- * Test for a falling/rising edge on the input pin: this is counted as *one* impulsion
+ * pwiPulseSensor::setPulseLength():
+ *
+ * Set the length of the impulsion in ms
  * 
  * Public
  */
-void pwiPulseSensor::loopInput()
+void pwiPulseSensor::setPulseLength( uint8_t length_ms )
 {
-	uint8_t state = digitalRead( this->input_pin );
+    this->length_ms = length_ms;
+}
 
-	bool isEdge = ( this->edge == FALLING && state == LOW && this->last_state == HIGH )
-				|| ( this->edge == RISING && state == HIGH && this->last_state == LOW );
+/**
+ * pwiPulseSensor::loopInput():
+ * 
+ * Test for a falling/rising edge on the input pin: this is counted as *one* impulsion
+ * Debouncing: do not even look at the pin state during the length of last impulsion
+ *
+ * Returns true if a pulse has been detected
+ * 
+ * Public
+ */
+bool pwiPulseSensor::loopInput()
+{
+	bool isEdge = false;
+	uint32_t now = millis();
+	uint32_t start_ms = this->last_ms + this->length_ms;
+	if( now > start_ms ){
+		uint8_t state = digitalRead( this->input_pin );
 
-	if( isEdge ){
-		this->imp_count += 1;
-#ifdef SKETCH_DEBUG
-		Serial.print( F( "edge detected count=" ));
-		Serial.println( this->imp_count );
+		isEdge = ( this->edge == FALLING && state == LOW && this->last_state == HIGH )
+					|| ( this->edge == RISING && state == HIGH && this->last_state == LOW );
+
+		if( isEdge ){
+			this->imp_count += 1;
+			this->last_ms = now;
+#ifdef SENSOR_DEBUG
+			Serial.print( F( "edge detected count=" ));
+			Serial.println( this->imp_count );
 #endif
+		}
+		this->last_state = state;
 	}
-
-	this->last_state = state;
+	return isEdge;
 }
